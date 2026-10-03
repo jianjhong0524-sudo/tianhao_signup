@@ -1,0 +1,155 @@
+<!doctype html>
+<!--
+  天浩佛堂 — LINE 線上報名頁（放在 GitHub Pages，LIFF 打開的就是這一頁）
+
+  要改的只有下面 <script> 開頭的兩個常數：
+    LIFF_ID  LINE Developers → LINE Login channel → LIFF 分頁上的 ID
+    API_URL  Apps Script「部署 → 網頁應用程式」給的網址（結尾 /exec）
+  兩者都不是祕密：這一頁本來就是公開的，真正的門在 Apps Script 驗 LINE 身分那一步。
+
+  ⚠️ 不要用 Apps Script 直接產生這一頁：它的網頁包在 Google 另一個網域的
+     iframe 裡，LIFF 會因為網址對不上而登入失敗。
+  ⚠️ 送資料用 Content-Type: text/plain——Apps Script 不回 CORS 預檢，
+     用 application/json 會被瀏覽器擋下。
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>天浩佛堂 課程報名</title>
+<style>
+  :root { --bg:#faf8f4; --card:#fff; --text:#24292f; --muted:#6b7280;
+          --primary:#007acc; --ok:#1a7f37; --danger:#cf222e; --border:#dfe3e8; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+         background:var(--bg); color:var(--text); font-size:17px; line-height:1.6; }
+  main { max-width:480px; margin:0 auto; padding:24px 16px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; }
+  h1 { font-size:1.3rem; margin:0 0 4px; }
+  .muted { color:var(--muted); font-size:.92rem; }
+  label { display:block; margin-top:16px; font-weight:600; }
+  input { width:100%; margin-top:6px; padding:12px; font-size:17px;
+          border:1px solid var(--border); border-radius:8px; }
+  button { width:100%; margin-top:24px; padding:14px; font-size:18px; border:none;
+           border-radius:8px; background:var(--primary); color:#fff; }
+  button:disabled { opacity:.5; }
+  .done { color:var(--ok); font-size:1.15rem; font-weight:600; }
+  .error { color:var(--danger); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <p id="loading" class="muted">讀取中…</p>
+
+    <div id="form-box" hidden>
+      <h1 id="class-name"></h1>
+      <p class="muted">天浩佛堂 課程報名</p>
+      <form id="form">
+        <label>姓名
+          <input id="name" name="name" required maxlength="40" autocomplete="name">
+        </label>
+        <label>電話
+          <input id="phone" name="phone" required inputmode="tel" autocomplete="tel"
+                 placeholder="0912345678">
+        </label>
+        <p id="form-error" class="error" hidden></p>
+        <button type="submit" id="submit">我要報名</button>
+      </form>
+      <p class="muted" style="margin-top:16px">
+        資料只用於這門課的報名與聯絡。下次報名會自動帶出你這次填的姓名電話。
+      </p>
+    </div>
+
+    <div id="result" hidden>
+      <p id="result-text"></p>
+      <button type="button" id="close">關閉</button>
+    </div>
+  </div>
+</main>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+  var LIFF_ID = '請填 LIFF ID';
+  var API_URL = 'https://script.google.com/macros/s/AKfycbwmdB4QGjZb_NC0ZolYtl3aiNEV1CVf_TpVETfgGv2JBH7P6YVBhgoOsFv-6jTlre8B/exec';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var code = '';
+  var idToken = '';
+
+  function api(action, payload) {
+    var body = Object.assign({action: action}, payload || {});
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json(); });
+  }
+
+  function show(message, ok) {
+    $('loading').hidden = true;
+    $('form-box').hidden = true;
+    $('result').hidden = false;
+    $('result-text').textContent = message;
+    $('result-text').className = ok ? 'done' : 'error';
+  }
+
+  $('close').addEventListener('click', function () {
+    if (liff.isInClient()) { liff.closeWindow(); } else { window.close(); }
+  });
+
+  $('form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    $('submit').disabled = true;
+    $('submit').textContent = '送出中…';
+    api('signup', {idToken: idToken, code: code,
+                   name: $('name').value, phone: $('phone').value})
+      .then(function (res) {
+        if (res.ok) { show(res.message, true); return; }
+        // 欄位問題留在表單上讓他改；其他問題直接顯示
+        if (/姓名|電話/.test(res.message || '')) {
+          $('form-error').textContent = res.message;
+          $('form-error').hidden = false;
+          $('submit').disabled = false;
+          $('submit').textContent = '我要報名';
+        } else {
+          show(res.message || '報名失敗，請稍後再試', false);
+        }
+      })
+      .catch(function () {
+        show('網路不穩，報名沒有送出。請稍後重新打開連結再試一次。', false);
+      });
+  });
+
+  // LINE 的 SDK 沒載進來（網路不穩、被擋）時不要永遠停在「讀取中…」
+  if (typeof liff === 'undefined') {
+    show('LINE 元件載入失敗，請確認網路後重新打開報名連結。', false);
+    throw new Error('LIFF SDK 未載入');
+  }
+
+  liff.init({liffId: LIFF_ID}).then(function () {
+    if (!liff.isLoggedIn()) {           // 在 LINE 外面打開（例如電腦瀏覽器）時先登入
+      liff.login({redirectUri: location.href});
+      return;
+    }
+    code = new URLSearchParams(location.search).get('class') || '';
+    idToken = liff.getIDToken();
+    if (!code) { show('這個連結少了課程代碼，請向承辦人要正確的報名連結。', false); return; }
+
+    return Promise.all([api('class', {code: code}), api('me', {idToken: idToken})])
+      .then(function (results) {
+        var klass = results[0], me = results[1];
+        if (!klass.ok) { show(klass.message, false); return; }
+        if (!klass.open) { show('「' + klass.name + '」報名已截止。', false); return; }
+        $('class-name').textContent = klass.name;
+        if (me.ok) { $('name').value = me.name || ''; $('phone').value = me.phone || ''; }
+        $('loading').hidden = true;
+        $('form-box').hidden = false;
+      });
+  }).catch(function (err) {
+    show('無法開啟報名頁（' + (err && err.message || err) + '）。請從 LINE 裡重新點報名連結。', false);
+  });
+</script>
+</body>
+</html>
