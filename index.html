@@ -39,6 +39,10 @@
   .agenda { margin:4px 0 0; padding:0; list-style:none; font-size:.95rem; }
   .agenda span { color:var(--muted); display:inline-block; min-width:3.2em; }
   .error { color:var(--danger); }
+  .who { border:none; margin:16px 0 0; padding:0; }
+  .who legend { font-weight:600; padding:0; }
+  .who .choice { font-weight:400; margin-top:8px; display:flex; align-items:center; gap:10px; }
+  .who .choice input { width:22px; height:22px; margin:0; flex:none; }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -52,13 +56,34 @@
       <p class="muted">天浩佛堂 課程報名<span id="class-location"></span></p>
       <div id="class-sessions"></div>
       <form id="form">
-        <label>姓名
+        <!-- 2026-10-05：「本人」的報名佛堂才會記住這個 LINE 是誰，下次直接認得；
+             幫家人報名的永遠不記（不然長輩的課會被掛到子女身上） -->
+        <fieldset class="who">
+          <legend>這個 LINE 是你本人的嗎？</legend>
+          <label class="choice"><input type="radio" name="is_self" value="1" required>
+            是，我幫自己報名</label>
+          <label class="choice"><input type="radio" name="is_self" value="0">
+            不是，我幫家人或朋友報名</label>
+        </fieldset>
+        <label>姓名 <span class="muted" id="name-hint">（上課的人）</span>
           <input id="name" name="name" required maxlength="40" autocomplete="name">
         </label>
         <label>電話
           <input id="phone" name="phone" required inputmode="tel" autocomplete="tel"
                  placeholder="0912345678">
         </label>
+        <!-- 2026-10-05：與佛堂紙本「課程報名表」同樣三類，和接駁車一起問 -->
+        <fieldset class="who">
+          <legend>報名類別</legend>
+          <label class="choice"><input type="radio" name="role" value="adult" required> 成人參班</label>
+          <label class="choice"><input type="radio" name="role" value="child"> 兒童參班</label>
+          <label class="choice"><input type="radio" name="role" value="service"> 服務（佛堂志工協助周邊服務）</label>
+        </fieldset>
+        <fieldset class="who">
+          <legend>需要搭乘接駁車嗎？</legend>
+          <label class="choice"><input type="radio" name="shuttle" value="1" required> 需要</label>
+          <label class="choice"><input type="radio" name="shuttle" value="0"> 不需要</label>
+        </fieldset>
         <p id="form-error" class="error" hidden></p>
         <button type="submit" id="submit">我要報名</button>
       </form>
@@ -76,7 +101,7 @@
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
-  var LIFF_ID = '2011847734-qRuwSyT2';
+  var LIFF_ID = '請填 LIFF ID';
   var API_URL = 'https://script.google.com/macros/s/AKfycbwmdB4QGjZb_NC0ZolYtl3aiNEV1CVf_TpVETfgGv2JBH7P6YVBhgoOsFv-6jTlre8B/exec';
 
   var $ = function (id) { return document.getElementById(id); };
@@ -136,6 +161,19 @@
     $('result-text').className = ok ? 'done' : 'error';
   }
 
+  // 預填的是這個 LINE 本人上次填的資料；改選「幫家人報名」時清掉，免得送出本人的姓名
+  var mine = {name: '', phone: ''};
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="is_self"]'), function (r) {
+    r.addEventListener('change', function () {
+      var self = r.value === '1';
+      if (!self && $('name').value === mine.name && $('phone').value === mine.phone) {
+        $('name').value = ''; $('phone').value = '';
+      } else if (self && !$('name').value && !$('phone').value) {
+        $('name').value = mine.name; $('phone').value = mine.phone;
+      }
+    });
+  });
+
   $('close').addEventListener('click', function () {
     if (liff.isInClient()) { liff.closeWindow(); } else { window.close(); }
   });
@@ -144,7 +182,12 @@
     e.preventDefault();
     $('submit').disabled = true;
     $('submit').textContent = '送出中…';
-    api('signup', {idToken: idToken, code: code,
+    var picked = function (name) {
+      var el = document.querySelector('input[name="' + name + '"]:checked');
+      return el ? el.value : '';
+    };
+    api('signup', {idToken: idToken, code: code, is_self: picked('is_self'),
+                   role: picked('role'), shuttle: picked('shuttle'),
                    name: $('name').value, phone: $('phone').value})
       .then(function (res) {
         if (res.ok) { show(res.message, true); return; }
@@ -185,7 +228,10 @@
         if (!klass.open) { show('「' + klass.name + '」報名已截止。', false); return; }
         $('class-name').textContent = klass.name;
         renderInfo(klass.info);
-        if (me.ok) { $('name').value = me.name || ''; $('phone').value = me.phone || ''; }
+        if (me.ok) {
+          mine = {name: me.name || '', phone: me.phone || ''};
+          $('name').value = mine.name; $('phone').value = mine.phone;
+        }
         $('loading').hidden = true;
         $('form-box').hidden = false;
       });
