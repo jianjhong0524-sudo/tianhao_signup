@@ -17,6 +17,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>天浩佛堂 課程報名</title>
+<!-- LINE 貼連結時的預覽卡片（2026-10-05）。LINE 只讀原始 HTML、不跑 JS，所以抓不到
+     課程名稱（那是打開後才向 Sheet 查的）——沒有這幾行時，卡片會顯示表單上的固定文字。
+     課程名稱改由佛堂系統「複製報名訊息」放在貼出去的文字裡。 -->
+<meta name="description" content="點開連結，填寫姓名與電話即可完成報名。">
+<meta property="og:title" content="天浩佛堂 課程報名">
+<meta property="og:description" content="點開連結，填寫姓名與電話即可完成報名。">
+<meta property="og:type" content="website">
 <style>
   :root { --bg:#faf8f4; --card:#fff; --text:#24292f; --muted:#6b7280;
           --primary:#007acc; --ok:#1a7f37; --danger:#cf222e; --border:#dfe3e8; }
@@ -75,9 +82,9 @@
         <!-- 2026-10-05：與佛堂紙本「課程報名表」同樣三類，和接駁車一起問 -->
         <fieldset class="who">
           <legend>報名類別</legend>
-          <label class="choice"><input type="radio" name="role" value="adult" required> 成人參班(參加光明講堂的課程)</label>
-          <label class="choice"><input type="radio" name="role" value="child"> 兒童參班(佛光兒童班課程)</label>
-          <label class="choice"><input type="radio" name="role" value="service"> 服務(協助餐務、引導、報到等服務工作)</label>
+          <label class="choice"><input type="radio" name="role" value="adult" required> 成人參班</label>
+          <label class="choice"><input type="radio" name="role" value="child"> 兒童參班</label>
+          <label class="choice"><input type="radio" name="role" value="service"> 服務（佛堂志工協助周邊服務）</label>
         </fieldset>
         <fieldset class="who">
           <legend>需要搭乘接駁車嗎？</legend>
